@@ -60,6 +60,28 @@ def admin_view(track_id):
     cur = db.execute("SELECT * FROM open_events WHERE track_id = ? ORDER BY opened_at DESC", (track_id,))
     events = cur.fetchall()
     return render_template("admin.html", track_id=track_id, events=events)
+    
+# 自动初始化数据库（部署后首次运行时执行）
+if not os.path.exists("tracker.db"):
+    print("Tracker DB not found, initializing...")
+    with app.app_context():
+        db = get_db()
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS tracking (
+                id TEXT PRIMARY KEY,
+                created_at TEXT
+            )
+        """)
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS open_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                track_id TEXT,
+                opened_at TEXT,
+                ip TEXT,
+                user_agent TEXT
+            )
+        """)
+        db.commit()
 
 if __name__ == "__main__":
     if not os.path.exists(DATABASE):
