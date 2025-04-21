@@ -1,89 +1,92 @@
-from flask import Flask, send_file, request, g, render_template
-import sqlite3
-import os
+from flask import Flask, request, render_template, send_file, redirect, url_for
+from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+import pytz
+import io
+import plotly.graph_objs as go
+from collections import Counter
+import geoip2.database
+import os
 
 app = Flask(__name__)
-DATABASE = 'tracker.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tracker.db'
+db = SQLAlchemy(app)
 
-def get_db():
-    db = getattr(g, '_database', None)
-    if db is None:
-        db = g._database = sqlite3.connect(DATABASE)
-        db.row_factory = sqlite3.Row
-    return db
+class OpenEvent(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    track_id = db.Column(db.String(100))
+    ip = db.Column(db.String(100))
+    user_agent = db.Column(db.Text)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
-@app.teardown_appcontext
-def close_connection(exception):
-    db = getattr(g, '_database', None)
-    if db is not None:
-        db.close()
+@app.before_first_request
+def create_tables():
+    db.create_all()
 
-def init_db():
-    with app.app_context():
-        db = get_db()
-        db.execute("""CREATE TABLE IF NOT EXISTS tracking (
-                        id TEXT PRIMARY KEY,
-                        created_at TEXT
-                    )""")
-        db.execute("""CREATE TABLE IF NOT EXISTS open_events (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        track_id TEXT,
-                        opened_at TEXT,
-                        ip TEXT,
-                        user_agent TEXT
-                    )""")
-        db.commit()
+@app.route('/')
+def index():
+    ids = db.session.query(OpenEvent.track_id).distinct().all()
+    return render_template('index.html', ids=[id[0] for id in ids])
 
-@app.route("/track/<track_id>.png")
+@app.route('/track/<track_id>.png')
 def track_pixel(track_id):
-    db = get_db()
-    cur = db.execute("SELECT * FROM tracking WHERE id = ?", (track_id,))
-    row = cur.fetchone()
-    if row is None:
-        db.execute("INSERT INTO tracking (id, created_at) VALUES (?, ?)", (track_id, datetime.utcnow().isoformat()))
-        db.commit()
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    ua = request.headers.get('User-Agent')
+    event = OpenEvent(track_id=track_id, ip=ip, user_agent=ua)
+    db.session.add(event)
+    db.session.commit()
 
-    db.execute("INSERT INTO open_events (track_id, opened_at, ip, user_agent) VALUES (?, ?, ?, ?)", (
-        track_id,
-        datetime.utcnow().isoformat(),
-        request.remote_addr,
-        request.headers.get('User-Agent')
-    ))
-    db.commit()
+    # 返回透明像素图
+    pixel = b'\x47\x49\x46\x38\x39\x61\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xFF\xFF\xFF\x21\xF9\x04\x01\x00\x00\x00\x00\x2C\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02\x4C\x01\x00\x3B'
+    return send_file(io.BytesIO(pixel), mimetype='image/gif')
 
-    return send_file("static/pixel.png", mimetype="image/png")
-
-@app.route("/admin/<track_id>")
+@app.route('/admin/<track_id>')
 def admin_view(track_id):
-    db = get_db()
-    cur = db.execute("SELECT * FROM open_events WHERE track_id = ? ORDER BY opened_at DESC", (track_id,))
-    events = cur.fetchall()
-    return render_template("admin.html", track_id=track_id, events=events)
-    
-# 自动初始化数据库（部署后首次运行时执行）
-if not os.path.exists("tracker.db"):
-    print("Tracker DB not found, initializing...")
-    with app.app_context():
-        db = get_db()
-        db.execute("""
-            CREATE TABLE IF NOT EXISTS tracking (
-                id TEXT PRIMARY KEY,
-                created_at TEXT
-            )
-        """)
-        db.execute("""
-            CREATE TABLE IF NOT EXISTS open_events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                track_id TEXT,
-                opened_at TEXT,
-                ip TEXT,
-                user_agent TEXT
-            )
-        """)
-        db.commit()
+    events = OpenEvent.query.filter_by(track_id=track_id).order_by(OpenEvent.timestamp.desc()).all()
+    try:
+        reader = geoip2.database.Reader('GeoLite2-City.mmdb')
+    except:
+        reader = None
 
-if __name__ == "__main__":
-    if not os.path.exists(DATABASE):
-        init_db()
-    app.run(host='0.0.0.0', port=5000)
+    results = []
+    for e in events:
+        beijing = e.timestamp.replace(tzinfo=pytz.utc).astimezone(pytz.timezone('Asia/Shanghai'))
+        eastern = e.timestamp.replace(tzinfo=pytz.utc).astimezone(pytz.timezone('US/Eastern'))
+        geo = 'Unknown'
+        if reader:
+            try:
+                res = reader.city(e.ip)
+                geo = f"{res.country.name}, {res.subdivisions.most_specific.name}"
+            except:
+                pass
+        results.append({
+            'time_cn': beijing.strftime('%Y-%m-%d %H:%M:%S'),
+            'time_us': eastern.strftime('%Y-%m-%d %H:%M:%S'),
+            'ip': e.ip,
+            'ua': e.user_agent,
+            'geo': geo
+        })
+    return render_template('detail.html', track_id=track_id, results=results)
+
+@app.route('/dashboard')
+def dashboard():
+    records = OpenEvent.query.all()
+    ids = Counter([r.track_id for r in records])
+    hours = [r.timestamp.replace(tzinfo=pytz.utc).astimezone(pytz.timezone('Asia/Shanghai')).hour for r in records]
+    ip_counts = Counter([r.ip for r in records])
+
+    bar_ids = go.Bar(x=list(ids.keys()), y=list(ids.values()), name='Opens per Tracking ID')
+    bar_hours = go.Histogram(x=hours, nbinsx=24, name='Open Time (Beijing Hour)')
+    pie_ip = go.Pie(labels=[ip for ip, _ in ip_counts.most_common(5)], values=[v for _, v in ip_counts.most_common(5)], name='Top IPs')
+
+    graphs = [
+        dict(id="bar_ids", figure=bar_ids),
+        dict(id="bar_hours", figure=bar_hours),
+        dict(id="pie_ip", figure=pie_ip)
+    ]
+
+    return render_template('dashboard.html', graphs=graphs)
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
