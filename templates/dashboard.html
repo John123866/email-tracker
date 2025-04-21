@@ -1,0 +1,12 @@
+{% extends 'layout.html' %}
+{% block content %}
+  <h2>Dashboard</h2>
+  <div id="bar_ids"></div>
+  <div id="bar_hours"></div>
+  <div id="pie_ip"></div>
+  <script>
+    {% for g in graphs %}
+      Plotly.newPlot("{{g.id}}", [{{ g.figure | tojson }}]);
+    {% endfor %}
+  </script>
+{% endblock %}

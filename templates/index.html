@@ -1,0 +1,9 @@
+{% extends 'layout.html' %}
+{% block content %}
+  <h2>All Tracking IDs</h2>
+  <ul>
+  {% for id in ids %}
+    <li><a href="{{ url_for('admin_view', track_id=id) }}">{{ id }}</a></li>
+  {% endfor %}
+  </ul>
+{% endblock %}

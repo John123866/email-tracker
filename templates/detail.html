@@ -1,0 +1,17 @@
+{% extends 'layout.html' %}
+{% block content %}
+  <h2>Tracking ID: {{ track_id }}</h2>
+  <table border="1">
+    <tr><th>#</th><th>China Time</th><th>US Time</th><th>IP</th><th>Geo</th><th>User-Agent</th></tr>
+    {% for r in results %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td>{{ r.time_cn }}</td>
+      <td>{{ r.time_us }}</td>
+      <td>{{ r.ip }}</td>
+      <td>{{ r.geo }}</td>
+      <td>{{ r.ua }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+{% endblock %}
