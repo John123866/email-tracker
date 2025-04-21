@@ -1,0 +1,46 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="notice-box">
+  <strong>📢 注意事项：</strong><br>
+  在您的邮件 HTML 中嵌入以下像素追踪代码：<br>
+  <code>&lt;img src=&quot;https://email-tracker-y1k4.onrender.com/track/YOUR_ID.png&quot; width=&quot;1&quot; height=&quot;1&quot;&gt;</code><br>
+  请将 <code>YOUR_ID</code> 替换为您为该邮件设置的唯一标识符。
+</div>
+
+<form method="get" action="/" class="filter-form">
+  <label for="filter_id"><strong>📂 筛选 Tracking ID：</strong></label>
+  <select id="filter_id" name="filter_id" onchange="this.form.submit()">
+    <option value="">-- 请选择 --</option>
+    {% for id in all_ids %}
+      <option value="{{ id }}" {% if selected_id == id %}selected{% endif %}>{{ id }}</option>
+    {% endfor %}
+  </select>
+</form>
+
+<a href="/dashboard" class="btn-dashboard">📊 查看全部统计仪表盘</a>
+
+{% if selected_id %}
+  <h3>🔍 Tracking ID: <code>{{ selected_id }}</code></h3>
+  {% if events %}
+    <table class="styled-table">
+      <thead>
+        <tr><th>#</th><th>北京时间</th><th>美国时间</th><th>IP</th><th>地理位置</th><th>User-Agent</th></tr>
+      </thead>
+      <tbody>
+        {% for e in events %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ e.time_cn }}</td>
+          <td>{{ e.time_us }}</td>
+          <td>{{ e.ip }}</td>
+          <td>{{ e.location }}</td>
+          <td>{{ e.ua }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>该 ID 暂无记录。</p>
+  {% endif %}
+{% endif %}
+{% endblock %}
