@@ -59,12 +59,29 @@ def track_pixel(track_id):
     return send_file(io.BytesIO(pixel_data), mimetype='image/png')
 
 # ------------------------- 仪表盘 -------------------------
-@app.route('/')
-def index():
-    with sqlite3.connect(DB_FILE) as db:
-        cur = db.execute("SELECT track_id, COUNT(*) as opens FROM open_events GROUP BY track_id ORDER BY MAX(opened_at) DESC")
-        rows = cur.fetchall()
-    return render_template('index.html', rows=rows)
+@app.route("/")
+def home():
+    selected_id = request.args.get("filter_id")
+    all_ids = db.session.query(OpenEvent.track_id).distinct().all()
+    all_ids = [i[0] for i in all_ids]
+
+    events = []
+    if selected_id:
+        opens = OpenEvent.query.filter_by(track_id=selected_id).order_by(OpenEvent.timestamp.desc()).all()
+        for o in opens:
+            cn_time = o.timestamp.replace(tzinfo=pytz.utc).astimezone(cn_tz).strftime("%Y-%m-%d %H:%M:%S")
+            us_time = o.timestamp.replace(tzinfo=pytz.utc).astimezone(us_tz).strftime("%Y-%m-%d %H:%M:%S")
+            ip = o.ip or "Unknown"
+            location = resolve_ip(ip)
+            events.append({
+                "time_us": us_time,
+                "time_cn": cn_time,
+                "ip": ip,
+                "location": location,
+                "ua": o.user_agent
+            })
+
+    return render_template("index.html", all_ids=all_ids, selected_id=selected_id, events=events)
 
 # ------------------------- 某个追踪ID详情 -------------------------
 @app.route('/admin/<track_id>')
