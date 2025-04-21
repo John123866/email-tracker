@@ -1,9 +1,51 @@
-{% extends 'layout.html' %}
+{% extends "layout.html" %}
 {% block content %}
-  <h2>All Tracking IDs</h2>
-  <ul>
-  {% for id in ids %}
-    <li><a href="{{ url_for('admin_view', track_id=id) }}">{{ id }}</a></li>
-  {% endfor %}
-  </ul>
+<div class="container mt-4">
+    <h2>Email Pixel Tracker</h2>
+    <form method="get" action="/">
+        <div class="form-group">
+            <label for="filter_id"><strong>Filter by Tracking ID:</strong></label>
+            <select id="filter_id" name="filter_id" class="form-control" onchange="this.form.submit()">
+                <option value="">-- All --</option>
+                {% for id in all_ids %}
+                    <option value="{{ id }}" {% if selected_id == id %}selected{% endif %}>{{ id }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </form>
+
+    <a href="/dashboard" class="btn btn-primary mb-3 mt-3">📊 View Dashboard Summary</a>
+
+    {% if selected_id %}
+        <h4 class="mt-4">Tracking Results for: <code>{{ selected_id }}</code></h4>
+        {% if events %}
+            <table class="table table-bordered table-sm mt-2">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Time (US)</th>
+                        <th>Time (CN)</th>
+                        <th>IP</th>
+                        <th>Location</th>
+                        <th>User-Agent</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in events %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>{{ item.time_us }}</td>
+                            <td>{{ item.time_cn }}</td>
+                            <td>{{ item.ip }}</td>
+                            <td>{{ item.location }}</td>
+                            <td>{{ item.ua }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No events recorded for this ID.</p>
+        {% endif %}
+    {% endif %}
+</div>
 {% endblock %}
