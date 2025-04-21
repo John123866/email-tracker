@@ -1,0 +1,20 @@
+{% extends "layout.html" %}
+{% block content %}
+<h2>Dashboard Summary</h2>
+<p><strong>Total Tracking IDs:</strong> {{ total_sends }}</p>
+<p><strong>Total Opens:</strong> {{ total_opens }}</p>
+
+<h3>Top 5 IPs</h3>
+<ul>
+  {% for ip, count in top_ips %}
+    <li>{{ ip }} - {{ count }} opens</li>
+  {% endfor %}
+</ul>
+
+<h3>Open Hour Distribution (Beijing Time)</h3>
+<ul>
+  {% for hour, count in hourly %}
+    <li>{{ hour }}:00 - {{ count }} opens</li>
+  {% endfor %}
+</ul>
+{% endblock %}
