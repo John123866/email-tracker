@@ -12,6 +12,9 @@ DB_FILE = 'email_tracker.db'
 GEO_FILE = 'GeoLite2-City.mmdb'
 GDRIVE_URL = 'https://drive.google.com/uc?export=download&id=18SEl_i1V5zIaS1_y4bW1WYas7rxSLcwG'
 
+cn_tz = pytz.timezone('Asia/Shanghai')
+us_tz = pytz.timezone('America/New_York')
+
 # ------------------------- 自动下载 mmdb -------------------------
 def ensure_geoip_file():
     if not os.path.exists(GEO_FILE):
@@ -26,6 +29,14 @@ def ensure_geoip_file():
                 print(f"[ERROR] 下载失败，状态码: {r.status_code}")
         except Exception as e:
             print(f"[ERROR] 下载 GeoIP 数据库时出错: {e}")
+
+def resolve_ip(ip):
+    try:
+        reader = geoip2.database.Reader(GEO_FILE)
+        res = reader.city(ip)
+        return f"{res.country.name or ''} {res.subdivisions.most_specific.name or ''} {res.city.name or ''}"
+    except:
+        return "未知"
 
 ensure_geoip_file()
 
@@ -55,31 +66,31 @@ def track_pixel(track_id):
                    (track_id, opened_at, ip, user_agent))
         db.commit()
 
-    pixel_data = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\x0cIDAT\x08\xd7c``\x00\x00\x00\x04\x00\x01\x0d\n*\xb4\x00\x00\x00\x00IEND\xaeB`\x82'
+    pixel_data = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\x0cIDAT\x08\xd7c``\x00\x00\x00\x04\x00\x01\r\n*\xb4\x00\x00\x00\x00IEND\xaeB`\x82'
     return send_file(io.BytesIO(pixel_data), mimetype='image/png')
 
-# ------------------------- 仪表盘 -------------------------
+# ------------------------- 首页筛选 + 展示 -------------------------
 @app.route("/")
 def home():
     selected_id = request.args.get("filter_id")
-    all_ids = db.session.query(OpenEvent.track_id).distinct().all()
-    all_ids = [i[0] for i in all_ids]
+    with sqlite3.connect(DB_FILE) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT DISTINCT track_id FROM open_events")
+        all_ids = [row[0] for row in cur.fetchall()]
 
-    events = []
-    if selected_id:
-        opens = OpenEvent.query.filter_by(track_id=selected_id).order_by(OpenEvent.timestamp.desc()).all()
-        for o in opens:
-            cn_time = o.timestamp.replace(tzinfo=pytz.utc).astimezone(cn_tz).strftime("%Y-%m-%d %H:%M:%S")
-            us_time = o.timestamp.replace(tzinfo=pytz.utc).astimezone(us_tz).strftime("%Y-%m-%d %H:%M:%S")
-            ip = o.ip or "Unknown"
-            location = resolve_ip(ip)
-            events.append({
-                "time_us": us_time,
-                "time_cn": cn_time,
-                "ip": ip,
-                "location": location,
-                "ua": o.user_agent
-            })
+        events = []
+        if selected_id:
+            cur.execute("SELECT opened_at, ip, user_agent FROM open_events WHERE track_id = ? ORDER BY opened_at DESC", (selected_id,))
+            for row in cur.fetchall():
+                ts, ip, ua = row
+                try:
+                    utc_time = datetime.fromisoformat(ts)
+                    cn_time = utc_time.astimezone(cn_tz).strftime("%Y-%m-%d %H:%M:%S")
+                    us_time = utc_time.astimezone(us_tz).strftime("%Y-%m-%d %H:%M:%S")
+                except:
+                    cn_time = us_time = ts
+                location = resolve_ip(ip)
+                events.append({"time_cn": cn_time, "time_us": us_time, "ip": ip, "location": location, "ua": ua})
 
     return render_template("index.html", all_ids=all_ids, selected_id=selected_id, events=events)
 
