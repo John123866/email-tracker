@@ -1,2 +1,10 @@
 flask
+flask_sqlalchemy
+flask_bootstrap
 gunicorn
+requests
+pytz
+geoip2
+matplotlib
+pandas
+plotly
