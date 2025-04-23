@@ -4,51 +4,38 @@
   <strong>📢 注意事项：</strong><br>
   在您的邮件 HTML 中嵌入以下像素追踪代码：<br>
   <code>&lt;img src=&quot;https://email-tracker-y1k4.onrender.com/track/YOUR_ID.png&quot; width=&quot;1&quot; height=&quot;1&quot;&gt;</code><br>
-  请将 <code>YOUR_ID</code> 替换为您为该邮件设置的唯一标识符。
+  请将 <code>YOUR_ID</code> 替换为 <code>{campaign}-{email}</code>（如：<code>camp1-alice@gmail.com</code>）。
 </div>
 
 <form method="get" class="filters">
-  <!-- 前缀筛选 -->
   <label>Tracking ID 分组:
-    <select name="prefix">
+    <select name="prefix" onchange="this.form.submit()">
       <option value="">— 全部 —</option>
       {% for p in prefixes %}
-      <option value="{{ p }}" {% if p==sel_pref %}selected{% endif %}>{{ p }}</option>
+        <option value="{{ p }}" {% if p==sel_pref %}selected{% endif %}>{{ p }}</option>
       {% endfor %}
     </select>
   </label>
-
-  <!-- 预设时间 -->
-  <label>最近：
-    <select name="preset" onchange="this.form.submit()">
-      <option value="">自定义</option>
-      <option value="7">7 天</option>
-      <option value="30" selected>30 天</option>
-      <option value="90">90 天</option>
-    </select>
-  </label>
-
-  <!-- 自定义日期 -->
-  <label>从：<input type="date" name="start" value="{{ start_dt[:10] }}"></label>
-  <label>到：<input type="date" name="end"   value="{{ end_dt[:10] }}"></label>
-  <button type="submit">筛选</button>
 </form>
 
 <table>
 <thead>
   <tr>
-    <th>#</th><th>首启(Beijing)</th><th>首启(US)</th>
-    <th>IP</th><th>归属地</th><th>打开次数</th><th>UA 解析</th>
+    <th>#</th>
+    <th>Email</th>
+    <th>首启(Beijing)</th>
+    <th>首启(US)</th>
+    <th>打开次数</th>
+    <th>UA 描述</th>
   </tr>
 </thead>
 <tbody>
   {% for ev in events %}
   <tr>
     <td>{{ loop.index }}</td>
+    <td>{{ ev.email }}</td>
     <td>{{ ev.time_cn }}</td>
     <td>{{ ev.time_us }}</td>
-    <td>{{ ev.ip }}</td>
-    <td>{{ ev.location }}</td>
     <td>{{ ev.count }}</td>
     <td>{{ ev.ua_desc }}</td>
   </tr>
@@ -56,5 +43,5 @@
 </tbody>
 </table>
 
-<a href="{{ url_for('dashboard') }}">查看统计仪表盘</a>
+<p><a href="{{ url_for('dashboard') }}">查看统计仪表盘</a></p>
 {% endblock %}
