@@ -1,20 +1,22 @@
 {% extends "layout.html" %}
 {% block content %}
-<h2>Dashboard Summary</h2>
-<p><strong>Total Tracking IDs:</strong> {{ total_sends }}</p>
-<p><strong>Total Opens:</strong> {{ total_opens }}</p>
+<h1>统计仪表盘</h1>
+<p>总发送组数: {{ total_sends }}，总打开次数: {{ total_opens }}</p>
 
-<h3>Top 5 IPs</h3>
-<ul>
-  {% for ip, count in top_ips %}
-    <li>{{ ip }} - {{ count }} opens</li>
+<h2>每小时打开分布</h2>
+<table>
+  <tr><th>Hour</th><th>Count</th></tr>
+  {% for hr,cnt in hourly %}
+  <tr><td>{{ hr }}:00</td><td>{{ cnt }}</td></tr>
   {% endfor %}
-</ul>
+</table>
 
-<h3>Open Hour Distribution (Beijing Time)</h3>
-<ul>
-  {% for hour, count in hourly %}
-    <li>{{ hour }}:00 - {{ count }} opens</li>
+<h2>Top 5 IP</h2>
+<table>
+  <tr><th>IP</th><th>Count</th></tr>
+  {% for ip,cnt in top_ips %}
+  <tr><td>{{ ip }}</td><td>{{ cnt }}</td></tr>
   {% endfor %}
-</ul>
-{% endblock %}
+</table>
+
+<a href="{{ url_for('home') }}">← 返回首页</a>
